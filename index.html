@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Laporan Eksekutif</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PapaParse for fast CSV Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            900: '#060B18',
+                            800: '#0B132B',
+                            700: '#111D3C',
+                            600: '#1C2D5A',
+                            500: '#2A3F78',
+                        },
+                        gold: {
+                            300: '#FDE047',
+                            400: '#FACC15',
+                            500: '#D4AF37',
+                            600: '#B89428',
+                            700: '#96761A',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #060B18;
+            color: #E2E8F0;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gold-gradient-text {
+            background: linear-gradient(135deg, #FFF099 0%, #D4AF37 50%, #AA820A 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .gold-border-glow {
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.15);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+        }
+
+        .gold-card {
+            background: linear-gradient(180deg, rgba(17, 29, 60, 0.8) 0%, rgba(11, 19, 43, 0.95) 100%);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            backdrop-filter: blur(8px);
+        }
+
+        .gold-card:hover {
+            border-color: rgba(212, 175, 55, 0.5);
+            box-shadow: 0 4px 20px rgba(212, 175, 55, 0.15);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0B132B;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2A3F78;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #D4AF37;
+        }
+
+        /* Print Styling optimization */
+        @media print {
+            body {
+                background-color: #ffffff !important;
+                color: #0f172a !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .gold-card {
+                background: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                color: #0f172a !important;
+                box-shadow: none !important;
+            }
+            .gold-gradient-text {
+                background: none !important;
+                -webkit-text-fill-color: #0f172a !important;
+                color: #0f172a !important;
+            }
+            .print-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                color: #000000 !important;
+            }
+            .print-table th, .print-table td {
+                border: 1px solid #94a3b8 !important;
+                padding: 6px 10px !important;
+                font-size: 11px !important;
+                color: #000000 !important;
+            }
+            .print-table th {
+                background-color: #f1f5f9 !important;
+            }
+            .print-container {
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-gold-500 selection:text-navy-900">
+
+    <!-- Top Navigation / Header -->
+    <header class="bg-navy-800/90 border-b border-gold-500/30 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                
+                <!-- Title & Logo -->
+                <div class="flex items-center space-x-3 text-center md:text-left">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-gold-600 via-gold-400 to-gold-300 p-0.5 flex items-center justify-center shadow-lg shadow-gold-500/10">
+                        <div class="w-full h-full bg-navy-900 rounded-[10px] flex items-center justify-center">
+                            <i class="fa-solid fa-chart-line text-gold-400 text-xl"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-extrabold tracking-tight gold-gradient-text uppercase">
+                            Dashboard Laporan
+                        </h1>
+                        <p class="text-xs text-slate-400 flex items-center gap-2 justify-center md:justify-start">
+                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="statusDot"></span>
+                            <span id="syncStatusText">Disambung ke Google Sheets (Masa Nyata)</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Action Controls (Refresh, Auto-sync, Save PDF) -->
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3 no-print">
+                    <!-- Last Updated Time -->
+                    <div class="hidden lg:flex flex-col text-right pr-2 border-r border-navy-600">
+                        <span class="text-[10px] uppercase tracking-wider text-gold-500 font-semibold">Kemaskini Terakhir</span>
+                        <span class="text-xs font-mono text-slate-300" id="lastUpdatedTime">-</span>
+                    </div>
+
+                    <!-- Auto Refresh Toggle -->
+                    <button id="autoSyncBtn" onclick="toggleAutoSync()" class="px-3 py-2 text-xs font-medium rounded-lg bg-navy-700 hover:bg-navy-600 text-slate-300 border border-slate-700 transition flex items-center gap-1.5" title="Auto kemaskini setiap 60 saat">
+                        <i class="fa-solid fa-rotate text-gold-400 text-xs"></i>
+                        <span id="autoSyncLabel">Auto-Sync: ON</span>
+                    </button>
+
+                    <!-- Manual Refresh Button -->
+                    <button onclick="fetchSheetData()" class="px-3 py-2 text-xs font-semibold rounded-lg bg-navy-700 hover:bg-navy-600 text-gold-400 border border-gold-500/30 transition flex items-center gap-2 hover:border-gold-400 active:scale-95 shadow-sm">
+                        <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
+                        <span>Muat Semula Data</span>
+                    </button>
+
+                    <!-- Save / Print PDF Button -->
+                    <button onclick="triggerPDFExport()" class="px-4 py-2 text-xs font-bold rounded-lg bg-gradient-to-r from-gold-500 via-gold-400 to-gold-600 text-navy-900 hover:brightness-110 transition flex items-center gap-2 shadow-md shadow-gold-500/20 active:scale-95">
+                        <i class="fa-solid fa-file-pdf text-sm"></i>
+                        <span>Simpan / Cetak PDF</span>
+                    </button>
+
+                    <!-- Settings / Link Config -->
+                    <button onclick="toggleSettingsModal()" class="p-2 text-xs font-medium rounded-lg bg-navy-700 hover:bg-navy-600 text-slate-400 hover:text-gold-400 border border-slate-700 transition" title="Tetapan Sumber Data">
+                        <i class="fa-solid fa-gear text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 print-container">
+
+        <!-- Banner Laporan Cetak Khas (Hanya muncul waktu Print/PDF) -->
+        <div class="hidden print-only mb-6 border-b-2 border-slate-900 pb-4">
+            <div class="flex justify-between items-end">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900 uppercase">Laporan Prestasi & Data Eksekutif</h1>
+                    <p class="text-sm text-slate-600">Jana secara automatik daripada Integrasi Sistem Google Sheet</p>
+                </div>
+                <div class="text-right text-xs text-slate-500">
+                    <p>Tarikh Cetakan: <span id="printDateText"></span></p>
+                    <p>Status: Sah & Terkini</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification / Loading Bar -->
+        <div id="loadingState" class="gold-card rounded-2xl p-6 text-center transition-all">
+            <div class="inline-flex items-center space-x-3 text-gold-400">
+                <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
+                <span class="text-base font-semibold">Sedang memuat turun data terkini daripada Google Sheet...</span>
+            </div>
+        </div>
+
+        <div id="errorState" class="hidden bg-red-950/80 border border-red-500/50 rounded-2xl p-6 text-center text-red-200">
+            <i class="fa-solid fa-triangle-exclamation text-3xl text-red-400 mb-2"></i>
+            <h3 class="text-lg font-bold text-white mb-1">Gagal Mengambil Data</h3>
+            <p id="errorMessage" class="text-sm text-red-300 mb-4">Sila pastikan sambungan internet stabil atau pautan CSV Google Sheet sah.</p>
+            <button onclick="fetchSheetData()" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition">
+                Cuba Semula
+            </button>
+        </div>
+
+        <!-- Dashboard Body Container -->
+        <div id="dashboardContent" class="hidden space-y-6">
+
+            <!-- Dynamic KPI Metric Cards Header Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="kpiContainer">
+                <!-- Dynamic KPI Cards generated via JS -->
+            </div>
+
+            <!-- Filter & Search Controls Section -->
+            <section class="gold-card rounded-2xl p-5 shadow-xl no-print">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2 text-gold-400">
+                        <i class="fa-solid fa-filter"></i>
+                        <h2 class="text-sm font-bold uppercase tracking-wider">Penapis Data (Filters)</h2>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400" id="filterStatsText">Menunjukkan 0 daripada 0 rekod</span>
+                        <button onclick="resetFilters()" class="px-2.5 py-1 text-xs font-semibold rounded bg-navy-700 hover:bg-navy-600 text-gold-400 border border-gold-500/20 transition flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-rotate-left text-[10px]"></i>
+                            <span>Reset Filter</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="filterControlsGrid">
+                    <!-- Global Search Box -->
+                    <div class="space-y-1.5">
+                        <label class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-magnifying-glass text-gold-400 text-[10px]"></i>
+                            <span>Carian Kata Kunci</span>
+                        </label>
+                        <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Taip untuk mencari..." 
+                            class="w-full px-3 py-2 rounded-lg bg-navy-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-gold-500 placeholder-slate-500 transition">
+                    </div>
+
+                    <!-- Filter Dropdown 1 -->
+                    <div class="space-y-1.5" id="filterGroup1">
+                        <label class="text-xs font-medium text-slate-300 flex items-center gap-1.5" id="filterLabel1">
+                            <i class="fa-solid fa-list-check text-gold-400 text-[10px]"></i>
+                            <span>Filter Kategori</span>
+                        </label>
+                        <select id="filterSelect1" onchange="applyFilters()" class="w-full px-3 py-2 rounded-lg bg-navy-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-gold-500 transition">
+                            <option value="ALL">-- Semua --</option>
+                        </select>
+                    </div>
+
+                    <!-- Filter Dropdown 2 -->
+                    <div class="space-y-1.5" id="filterGroup2">
+                        <label class="text-xs font-medium text-slate-300 flex items-center gap-1.5" id="filterLabel2">
+                            <i class="fa-solid fa-tags text-gold-400 text-[10px]"></i>
+                            <span>Filter Status / Jenis</span>
+                        </label>
+                        <select id="filterSelect2" onchange="applyFilters()" class="w-full px-3 py-2 rounded-lg bg-navy-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-gold-500 transition">
+                            <option value="ALL">-- Semua --</option>
+                        </select>
+                    </div>
+
+                    <!-- Sort Control -->
+                    <div class="space-y-1.5">
+                        <label class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-arrow-down-wide-short text-gold-400 text-[10px]"></i>
+                            <span>Susun Mengikut Column</span>
+                        </label>
+                        <div class="flex gap-1">
+                            <select id="sortColumnSelect" onchange="applyFilters()" class="w-full px-3 py-2 rounded-lg bg-navy-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-gold-500 transition">
+                            </select>
+                            <button id="sortOrderBtn" onclick="toggleSortDirection()" class="px-3 py-2 rounded-lg bg-navy-700 hover:bg-navy-600 border border-slate-700 text-gold-400 transition" title="Tukar A-Z / Z-A">
+                                <i class="fa-solid fa-arrow-down-a-z" id="sortOrderIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Chart 1 Card -->
+                <div class="gold-card rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                        <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-gold-400"></i>
+                            <span id="chartTitle1">Analisis Taburan Data</span>
+                        </h3>
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-gold-500/10 text-gold-400 border border-gold-500/20 font-semibold">Carta Visual</span>
+                    </div>
+                    <div class="relative w-full h-64 flex items-center justify-center">
+                        <canvas id="chartCanvas1"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 2 Card -->
+                <div class="gold-card rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+                        <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-column text-gold-400"></i>
+                            <span id="chartTitle2">Perbandingan Nilai Metrik</span>
+                        </h3>
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-gold-500/10 text-gold-400 border border-gold-500/20 font-semibold">Bar Chart</span>
+                    </div>
+                    <div class="relative w-full h-64 flex items-center justify-center">
+                        <canvas id="chartCanvas2"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Data Table Container -->
+            <section class="gold-card rounded-2xl p-5 shadow-xl overflow-hidden">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-table text-gold-400"></i>
+                        <h2 class="text-sm font-bold text-slate-100 uppercase tracking-wider">Jadual Data Laporan Terperinci</h2>
+                    </div>
+
+                    <div class="flex items-center gap-3 no-print">
+                        <label class="text-xs text-slate-400 flex items-center gap-1.5">
+                            <span>Papar:</span>
+                            <select id="pageSizeSelect" onchange="changePageSize()" class="bg-navy-900 border border-slate-700 text-gold-400 rounded px-2 py-1 text-xs focus:outline-none">
+                                <option value="10" selected>10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="-1">Semua</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Scrollable Table -->
+                <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+                    <table class="w-full text-left border-collapse text-xs print-table" id="reportTable">
+                        <thead>
+                            <tr class="bg-navy-700/80 text-gold-400 font-semibold uppercase tracking-wider border-b border-gold-500/30" id="tableHeaderRow">
+                                <!-- Dynamic Headers -->
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60 bg-navy-900/40" id="tableBody">
+                            <!-- Dynamic Rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Footer / Pagination Controls -->
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-800 no-print text-xs text-slate-400">
+                    <div id="paginationInfo">
+                        Menunjukkan rekod 0 - 0 daripada 0
+                    </div>
+
+                    <div class="flex items-center space-x-1" id="paginationControls">
+                        <button onclick="goToPage(currentPage - 1)" id="prevPageBtn" class="px-3 py-1.5 rounded-lg bg-navy-700 hover:bg-navy-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 transition">
+                            <i class="fa-solid fa-chevron-left mr-1"></i> Sebelum
+                        </button>
+                        <span id="pageNumbers" class="px-2 font-mono text-gold-400 font-semibold">1 / 1</span>
+                        <button onclick="goToPage(currentPage + 1)" id="nextPageBtn" class="px-3 py-1.5 rounded-lg bg-navy-700 hover:bg-navy-600 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 transition">
+                            Seterusnya <i class="fa-solid fa-chevron-right ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Modal Settings / Config -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 no-print">
+        <div class="gold-card rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+            <button onclick="toggleSettingsModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <h3 class="text-lg font-bold text-gold-400 mb-2 flex items-center gap-2">
+                <i class="fa-solid fa-sliders"></i> Tetapan Sumber Data Google Sheet
+            </h3>
+            <p class="text-xs text-slate-300 mb-4">Pautan CSV Google Sheet semasa yang disambungkan:</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Pautan CSV Google Sheet</label>
+                    <input type="text" id="sheetUrlInput" class="w-full px-3 py-2 rounded-lg bg-navy-900 border border-slate-700 text-xs text-slate-200 font-mono focus:border-gold-500 focus:outline-none">
+                </div>
+                
+                <div class="p-3 rounded-lg bg-navy-900/60 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                    <p class="font-semibold text-gold-400"><i class="fa-solid fa-circle-info mr-1"></i> Nota Integrasi Live:</p>
+                    <p>Setiap kali anda menukar data di Google Sheet, Google secara automatik mengemaskini output CSV ini. Tekan "Muat Semula" pada bila-bila masa untuk mengambil angka terkini.</p>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button onclick="toggleSettingsModal()" class="px-4 py-2 rounded-lg bg-navy-700 text-xs font-semibold text-slate-300 hover:bg-navy-600 transition">Tutup</button>
+                    <button onclick="saveNewSheetUrl()" class="px-4 py-2 rounded-lg bg-gold-500 text-xs font-bold text-navy-900 hover:bg-gold-400 transition">Simpan & Muat Semula</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Default Google Sheet CSV Link provided by user
+        let SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTqJSl-j9sokt7fY_ipxnePEKQnWwGNzTs33qfXawU8G-ZfPlUlZiKxAy1Ro3oFL2k5sUXPRzCr43lL/pub?output=csv";
+
+        // Global State Variables
+        let rawData = [];
+        let filteredData = [];
+        let headers = [];
+        let numericColumns = [];
+        let categoricalColumns = [];
+        let sortColumn = "";
+        let sortAscending = true;
+        let currentPage = 1;
+        let pageSize = 10;
+        let autoSyncTimer = null;
+        let isAutoSyncOn = true;
+
+        // Chart Instances
+        let chartInstance1 = null;
+        let chartInstance2 = null;
+
+        // On Page Load Initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('sheetUrlInput').value = SHEET_CSV_URL;
+            fetchSheetData();
+
+            // Set auto sync interval (every 60 seconds)
+            startAutoSync();
+        });
+
+        async function fetchSheetData() {
+            showLoading(true);
+            showError(false);
+
+            const refreshIcon = document.getElementById('refreshIcon');
+            if (refreshIcon) refreshIcon.classList.add('fa-spin');
+
+            try {
+                // Fetch the CSV directly with cache busting query param
+                const cacheBusterUrl = SHEET_CSV_URL + (SHEET_CSV_URL.includes('?') ? '&' : '?') + '_t=' + new Date().getTime();
+                
+                Papa.parse(cacheBusterUrl, {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: 'greedy',
+                    complete: function(results) {
+                        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+                        
+                        if (results.data && results.data.length > 0) {
+                            rawData = results.data;
+                            headers = results.meta.fields || Object.keys(rawData[0]);
+                            processDataAndInitDashboard();
+                            showLoading(false);
+                            updateLastSyncTimestamp();
+                        } else {
+                            showError(true, "Data didapati kosong. Sila periksa semula isi kandungan Google Sheet anda.");
+                            showLoading(false);
+                        }
+                    },
+                    error: function(err) {
+                        console.error("PapaParse Error:", err);
+                        if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+                        showError(true, "Gagal membaca format CSV. Sila pastikan Google Sheet dipublish sebagai CSV.");
+                        showLoading(false);
+                    }
+                });
+            } catch (err) {
+                console.error("Fetch Exception:", err);
+                if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+                showError(true, "Masalah rangkaian semasa menyambung ke Google Sheet.");
+                showLoading(false);
+            }
+        }
+
+        function processDataAndInitDashboard() {
+            if (!rawData || rawData.length === 0) return;
+
+            // Detect column types (Numeric vs Categorical)
+            numericColumns = [];
+            categoricalColumns = [];
+
+            headers.forEach(col => {
+                let numericCount = 0;
+                let sampleCount = 0;
+
+                rawData.forEach(row => {
+                    const val = row[col];
+                    if (val !== undefined && val !== null && val !== "") {
+                        sampleCount++;
+                        // Clean currency / percentage formatting for testing numbers
+                        const cleanedVal = String(val).replace(/RM|\$|,|%/gi, '').trim();
+                        if (!isNaN(cleanedVal) && cleanedVal !== "") {
+                            numericCount++;
+                        }
+                    }
+                });
+
+                // If > 60% of non-empty values are numeric, treat as numeric column
+                if (sampleCount > 0 && (numericCount / sampleCount) > 0.6) {
+                    numericColumns.push(col);
+                } else {
+                    categoricalColumns.push(col);
+                }
+            });
+
+            // Set initial sort column
+            sortColumn = headers[0] || "";
+
+            // Populate Filter Select Boxes dynamically
+            populateFilterOptions();
+
+            // Populate Sort Select Box
+            populateSortOptions();
+
+            // Apply filters & render everything
+            applyFilters();
+
+            // Show dashboard
+            document.getElementById('dashboardContent').classList.remove('hidden');
+        }
+
+        function populateFilterOptions() {
+            const select1 = document.getElementById('filterSelect1');
+            const select2 = document.getElementById('filterSelect2');
+            const label1 = document.getElementById('filterLabel1');
+            const label2 = document.getElementById('filterLabel2');
+
+            select1.innerHTML = `<option value="ALL">-- Semua --</option>`;
+            select2.innerHTML = `<option value="ALL">-- Semua --</option>`;
+
+            // Choose categorical columns for filtering
+            const catCol1 = categoricalColumns[0] || headers[0];
+            const catCol2 = categoricalColumns[1] || headers[1] || headers[0];
+
+            if (label1) label1.querySelector('span').innerText = `Filter: ${catCol1}`;
+            if (label2) label2.querySelector('span').innerText = `Filter: ${catCol2}`;
+
+            select1.dataset.column = catCol1;
+            select2.dataset.column = catCol2;
+
+            if (catCol1) {
+                const uniqueVals1 = [...new Set(rawData.map(r => r[catCol1]).filter(Boolean))].sort();
+                uniqueVals1.forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.textContent = val;
+                    select1.appendChild(opt);
+                });
+            }
+
+            if (catCol2 && catCol2 !== catCol1) {
+                const uniqueVals2 = [...new Set(rawData.map(r => r[catCol2]).filter(Boolean))].sort();
+                uniqueVals2.forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.textContent = val;
+                    select2.appendChild(opt);
+                });
+            }
+        }
+
+        function populateSortOptions() {
+            const sortSelect = document.getElementById('sortColumnSelect');
+            sortSelect.innerHTML = "";
+            headers.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h;
+                opt.textContent = h;
+                sortSelect.appendChild(opt);
+            });
+            sortSelect.value = sortColumn;
+        }
+
+        function applyFilters() {
+            const searchKeyword = (document.getElementById('searchInput').value || "").toLowerCase().trim();
+            const select1 = document.getElementById('filterSelect1');
+            const select2 = document.getElementById('filterSelect2');
+
+            const col1 = select1.dataset.column;
+            const val1 = select1.value;
+
+            const col2 = select2.dataset.column;
+            const val2 = select2.value;
+
+            sortColumn = document.getElementById('sortColumnSelect').value || headers[0];
+
+            filteredData = rawData.filter(row => {
+                // Filter 1
+                if (val1 !== "ALL" && String(row[col1]) !== val1) return false;
+                // Filter 2
+                if (val2 !== "ALL" && String(row[col2]) !== val2) return false;
+
+                // Search keyword match across all fields
+                if (searchKeyword) {
+                    const match = headers.some(h => {
+                        const cellVal = String(row[h] || "").toLowerCase();
+                        return cellVal.includes(searchKeyword);
+                    });
+                    if (!match) return false;
+                }
+
+                return true;
+            });
+
+            // Apply Sorting
+            filteredData.sort((a, b) => {
+                let valA = a[sortColumn] ?? "";
+                let valB = b[sortColumn] ?? "";
+
+                // Clean numbers if sorting numeric column
+                const numA = parseFloat(String(valA).replace(/RM|\$|,|%/gi, ''));
+                const numB = parseFloat(String(valB).replace(/RM|\$|,|%/gi, ''));
+
+                if (!isNaN(numA) && !isNaN(numB)) {
+                    return sortAscending ? numA - numB : numB - numA;
+                }
+
+                valA = String(valA).toLowerCase();
+                valB = String(valB).toLowerCase();
+
+                if (valA < valB) return sortAscending ? -1 : 1;
+                if (valA > valB) return sortAscending ? 1 : -1;
+                return 0;
+            });
+
+            currentPage = 1;
+            renderKPIs();
+            renderCharts();
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = "";
+            document.getElementById('filterSelect1').value = "ALL";
+            document.getElementById('filterSelect2').value = "ALL";
+            sortAscending = true;
+            updateSortIcon();
+            applyFilters();
+        }
+
+        function toggleSortDirection() {
+            sortAscending = !sortAscending;
+            updateSortIcon();
+            applyFilters();
+        }
+
+        function updateSortIcon() {
+            const icon = document.getElementById('sortOrderIcon');
+            if (sortAscending) {
+                icon.className = "fa-solid fa-arrow-down-a-z";
+            } else {
+                icon.className = "fa-solid fa-arrow-up-z-a";
+            }
+        }
+
+        function renderKPIs() {
+            const container = document.getElementById('kpiContainer');
+            container.innerHTML = "";
+
+            // Card 1: Total Records
+            const card1 = createKPICardHtml("Jumlah Rekod", filteredData.length.toLocaleString(), "fa-database", "Emas", `Drp ${rawData.length} Keseluruhan`);
+            container.appendChild(card1);
+
+            // Numeric Columns KPIs
+            if (numericColumns.length > 0) {
+                numericColumns.slice(0, 3).forEach((col, idx) => {
+                    let total = 0;
+                    let validCount = 0;
+
+                    filteredData.forEach(row => {
+                        const rawVal = row[col];
+                        const clean = parseFloat(String(rawVal).replace(/RM|\$|,|%/gi, ''));
+                        if (!isNaN(clean)) {
+                            total += clean;
+                            validCount++;
+                        }
+                    });
+
+                    // Format Value
+                    let displayVal = total.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                    let subtext = `Purata: ${(validCount > 0 ? (total / validCount) : 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
+
+                    const icons = ["fa-sack-dollar", "fa-chart-simple", "fa-calculator"];
+                    const card = createKPICardHtml(col, displayVal, icons[idx % icons.length], "Emas", subtext);
+                    container.appendChild(card);
+                });
+            } else if (categoricalColumns.length > 1) {
+                // Fallback KPI: Unique values count
+                const catCol = categoricalColumns[0];
+                const uniqueSet = new Set(filteredData.map(r => r[catCol]));
+                const card = createKPICardHtml(`Kategori (${catCol})`, uniqueSet.size.toLocaleString(), "fa-layer-group", "Emas", "Jenis Unik");
+                container.appendChild(card);
+            }
+
+            // Filter Stats Text
+            document.getElementById('filterStatsText').innerText = `Menunjukkan ${filteredData.length} daripada ${rawData.length} rekod`;
+        }
+
+        function createKPICardHtml(title, value, iconClass, tag, subtext) {
+            const div = document.createElement('div');
+            div.className = "gold-card rounded-2xl p-5 shadow-lg flex flex-col justify-between relative overflow-hidden group";
+            div.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider truncate pr-2">${title}</span>
+                    <div class="w-9 h-9 rounded-xl bg-gold-500/10 border border-gold-500/30 flex items-center justify-center text-gold-400 shrink-0">
+                        <i class="fa-solid ${iconClass} text-sm"></i>
+                    </div>
+                </div>
+                <div class="my-1">
+                    <div class="text-2xl font-black text-slate-100 font-mono tracking-tight group-hover:text-gold-300 transition-colors truncate">${value}</div>
+                </div>
+                <div class="text-[11px] font-medium text-gold-400/80 flex items-center gap-1 mt-1 pt-2 border-t border-slate-800/80">
+                    <i class="fa-solid fa-circle-info text-[9px]"></i>
+                    <span>${subtext}</span>
+                </div>
+            `;
+            return div;
+        }
+
+        function renderCharts() {
+            if (filteredData.length === 0) return;
+
+            // Chart 1: Categorical Distribution (Pie/Doughnut)
+            const catCol = categoricalColumns[0] || headers[0];
+            const counts = {};
+            filteredData.forEach(r => {
+                const key = r[catCol] || 'Lain-lain';
+                counts[key] = (counts[key] || 0) + 1;
+            });
+
+            const labels1 = Object.keys(counts).slice(0, 8); // Top 8
+            const data1 = labels1.map(k => counts[k]);
+
+            document.getElementById('chartTitle1').innerText = `Taburan mengikut ${catCol}`;
+
+            const goldPalette = [
+                '#D4AF37', '#FACC15', '#B89428', '#2A3F78', '#1C2D5A', '#EAB308', '#96761A', '#64748B'
+            ];
+
+            const ctx1 = document.getElementById('chartCanvas1').getContext('2d');
+            if (chartInstance1) chartInstance1.destroy();
+
+            chartInstance1 = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: labels1,
+                    datasets: [{
+                        data: data1,
+                        backgroundColor: goldPalette,
+                        borderColor: '#0B132B',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#CBD5E1',
+                                font: { size: 10, family: 'Inter' },
+                                boxWidth: 12
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Chart 2: Numeric Bar Chart
+            const ctx2 = document.getElementById('chartCanvas2').getContext('2d');
+            if (chartInstance2) chartInstance2.destroy();
+
+            if (numericColumns.length > 0) {
+                const numCol = numericColumns[0];
+                document.getElementById('chartTitle2').innerText = `Nilai Top 10 (${numCol})`;
+
+                // Top 10 items for numeric chart
+                const top10 = [...filteredData].slice(0, 10);
+                const labels2 = top10.map((r, i) => r[catCol] || `Item ${i+1}`);
+                const data2 = top10.map(r => {
+                    const clean = parseFloat(String(r[numCol]).replace(/RM|\$|,|%/gi, ''));
+                    return isNaN(clean) ? 0 : clean;
+                });
+
+                chartInstance2 = new Chart(ctx2, {
+                    type: 'bar',
+                    data: {
+                        labels: labels2,
+                        datasets: [{
+                            label: numCol,
+                            data: data2,
+                            backgroundColor: 'rgba(212, 175, 55, 0.75)',
+                            borderColor: '#D4AF37',
+                            borderWidth: 1.5,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: '#94A3B8', font: { size: 10 } },
+                                grid: { color: 'rgba(255,255,255,0.05)' }
+                            },
+                            y: {
+                                ticks: { color: '#94A3B8', font: { size: 10 } },
+                                grid: { color: 'rgba(255,255,255,0.05)' }
+                            }
+                        }
+                    }
+                });
+            } else {
+                // Fallback Count Bar Chart
+                const catCol2 = categoricalColumns[1] || headers[1] || headers[0];
+                document.getElementById('chartTitle2').innerText = `Kuantiti Mengikut ${catCol2}`;
+
+                const counts2 = {};
+                filteredData.forEach(r => {
+                    const key = r[catCol2] || 'N/A';
+                    counts2[key] = (counts2[key] || 0) + 1;
+                });
+
+                const labels2 = Object.keys(counts2).slice(0, 8);
+                const data2 = labels2.map(k => counts2[k]);
+
+                chartInstance2 = new Chart(ctx2, {
+                    type: 'bar',
+                    data: {
+                        labels: labels2,
+                        datasets: [{
+                            label: 'Jumlah',
+                            data: data2,
+                            backgroundColor: 'rgba(42, 63, 120, 0.85)',
+                            borderColor: '#D4AF37',
+                            borderWidth: 1,
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { display: false } },
+                            y: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                        }
+                    }
+                });
+            }
+        }
+
+        function renderTable() {
+            const tableHeaderRow = document.getElementById('tableHeaderRow');
+            const tableBody = document.getElementById('tableBody');
+
+            // Render Header
+            tableHeaderRow.innerHTML = "";
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.className = "px-4 py-3 cursor-pointer hover:text-white transition select-none";
+                th.innerHTML = `
+                    <div class="flex items-center space-x-1">
+                        <span>${h}</span>
+                        ${sortColumn === h ? `<i class="fa-solid fa-sort-${sortAscending ? 'up' : 'down'} text-gold-400 text-[10px]"></i>` : ''}
+                    </div>
+                `;
+                th.onclick = () => {
+                    if (sortColumn === h) {
+                        sortAscending = !sortAscending;
+                    } else {
+                        sortColumn = h;
+                        sortAscending = true;
+                    }
+                    document.getElementById('sortColumnSelect').value = sortColumn;
+                    updateSortIcon();
+                    applyFilters();
+                };
+                tableHeaderRow.appendChild(th);
+            });
+
+            // Calculate Pagination
+            const totalItems = filteredData.length;
+            let displayData = filteredData;
+
+            if (pageSize > 0) {
+                const totalPages = Math.ceil(totalItems / pageSize) || 1;
+                if (currentPage > totalPages) currentPage = totalPages;
+                if (currentPage < 1) currentPage = 1;
+
+                const startIdx = (currentPage - 1) * pageSize;
+                const endIdx = startIdx + pageSize;
+                displayData = filteredData.slice(startIdx, endIdx);
+
+                document.getElementById('paginationInfo').innerText = `Menunjukkan ${totalItems > 0 ? startIdx + 1 : 0} - ${Math.min(endIdx, totalItems)} daripada ${totalItems} rekod`;
+                document.getElementById('pageNumbers').innerText = `${currentPage} / ${totalPages}`;
+                document.getElementById('prevPageBtn').disabled = (currentPage === 1);
+                document.getElementById('nextPageBtn').disabled = (currentPage === totalPages || totalPages === 0);
+            } else {
+                document.getElementById('paginationInfo').innerText = `Menunjukkan semua ${totalItems} rekod`;
+                document.getElementById('pageNumbers').innerText = "1 / 1";
+                document.getElementById('prevPageBtn').disabled = true;
+                document.getElementById('nextPageBtn').disabled = true;
+            }
+
+            // Render Rows
+            tableBody.innerHTML = "";
+            if (displayData.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="${headers.length}" class="px-4 py-8 text-center text-slate-400">
+                            <i class="fa-solid fa-folder-open text-2xl mb-2 text-gold-500/40 block"></i>
+                            Tiada data dijumpai mengikut carian / filter semasa.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            displayData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = idx % 2 === 0 ? "bg-navy-800/40 hover:bg-navy-700/60 transition" : "bg-navy-900/40 hover:bg-navy-700/60 transition";
+
+                headers.forEach(h => {
+                    const td = document.createElement('td');
+                    td.className = "px-4 py-3 text-slate-200 whitespace-nowrap font-mono";
+                    const val = row[h] !== undefined && row[h] !== null ? row[h] : "";
+
+                    // Highlight numbers or status keywords if present
+                    if (numericColumns.includes(h)) {
+                        td.innerHTML = `<span class="text-gold-300 font-semibold">${val}</span>`;
+                    } else {
+                        td.textContent = val;
+                    }
+
+                    tr.appendChild(td);
+                });
+
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function changePageSize() {
+            pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10);
+            currentPage = 1;
+            renderTable();
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderTable();
+        }
+
+        function triggerPDFExport() {
+            // Set Print Date Text
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ms-MY', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+            document.getElementById('printDateText').innerText = dateStr;
+
+            // Trigger window print dialog (allows Save as PDF)
+            window.print();
+        }
+
+        // Auto Sync Logic
+        function startAutoSync() {
+            if (autoSyncTimer) clearInterval(autoSyncTimer);
+            autoSyncTimer = setInterval(() => {
+                if (isAutoSyncOn) {
+                    fetchSheetData();
+                }
+            }, 60000); // Every 60s
+        }
+
+        function toggleAutoSync() {
+            isAutoSyncOn = !isAutoSyncOn;
+            const label = document.getElementById('autoSyncLabel');
+            const statusDot = document.getElementById('statusDot');
+
+            if (isAutoSyncOn) {
+                label.innerText = "Auto-Sync: ON";
+                statusDot.className = "inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                startAutoSync();
+            } else {
+                label.innerText = "Auto-Sync: OFF";
+                statusDot.className = "inline-block w-2 h-2 rounded-full bg-slate-500";
+                if (autoSyncTimer) clearInterval(autoSyncTimer);
+            }
+        }
+
+        function updateLastSyncTimestamp() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('lastUpdatedTime').innerText = timeStr;
+            document.getElementById('syncStatusText').innerText = `Disambung ke Google Sheets (${timeStr})`;
+        }
+
+        // UI Helpers
+        function showLoading(show) {
+            const el = document.getElementById('loadingState');
+            if (show) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        }
+
+        function showError(show, msg = "") {
+            const el = document.getElementById('errorState');
+            if (show) {
+                document.getElementById('errorMessage').innerText = msg;
+                el.classList.remove('hidden');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        function toggleSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.toggle('hidden');
+        }
+
+        function saveNewSheetUrl() {
+            const inputVal = document.getElementById('sheetUrlInput').value.trim();
+            if (inputVal) {
+                SHEET_CSV_URL = inputVal;
+                toggleSettingsModal();
+                fetchSheetData();
+            }
+        }
+    </script>
+</body>
+</html>
